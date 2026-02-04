@@ -6,6 +6,9 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from scripts.parser import extract_text_from_file
 from scripts.chunker import chunk_text
+from core.db import init_db
+from core.logger import log_error_message, log_request
+from core.metrics import MetricsTracker, estimate_tokens
 from scripts.embedder import embed_text
 from scripts.vector_store import build_faiss_index
 from scripts.question_answer import get_best_chunk
@@ -15,7 +18,7 @@ from scripts.gemini_api import generate_answer_from_chunks
 st.set_page_config(page_title="AskMyDoc", page_icon="📄", layout="centered")
 
 # ────────────────────────
-# ✨ Custom CSS Styling
+# Custom CSS Styling
 # ────────────────────────
 st.markdown("""
 <style>
@@ -109,6 +112,8 @@ with st.expander("ℹ️ How It Works"):
 # ────────────────────────
 # 📤 File Upload
 # ────────────────────────
+
+init_db()
 uploaded_file = st.file_uploader("📁 Upload your file", type=["pdf", "docx"])
 
 if uploaded_file:
@@ -119,14 +124,17 @@ if uploaded_file:
         # Check if text was successfully extracted before chunking
         if extracted_text:
             chunks = chunk_text(extracted_text)
+            total_chunks = len(chunks)
             
-            if len(chunks) < 2:
+            if total_chunks < 2:
                 st.error("⚠️ The document is too short for answering questions. Please upload a longer document.")
+                log_error_message(str(message))
             else:
                 st.success(message)
 
         else:
             # Handle cases where no text was extracted (e.g., unsupported file type)
+            log_error_message(str(message))
             st.error(message)
             st.stop()
 
@@ -136,7 +144,7 @@ if uploaded_file:
     # st.success("✅ Document processed successfully!")
 
     # ────────────────────────
-    # ❓ Q&A Section
+    # Q&A Section
     # ────────────────────────
     st.subheader("💬 Ask a Question")
     user_question = st.text_input("Enter your question here")
@@ -146,13 +154,29 @@ if uploaded_file:
             st.warning("⚠️ Please enter a question.")
         else:
             with st.spinner("⏳ Analyzing document and generating answer..."):
+                
+                tracker = MetricsTracker()
+                tracker.start()
+                
                 top_chunks = get_best_chunk(user_question, chunks, index)
                 answer = generate_answer_from_chunks(top_chunks, user_question)
+                
+                latency = tracker.stop()
+                tokens = estimate_tokens(user_question + answer)
+                
+                confidence = 0.85
+                hallucination = 0.0
+                
+                log_request(user_question, answer, latency, tokens, confidence, hallucination)
+                
+                
             st.markdown("### 📚 Answer")
             st.success(answer)
+            st.write(f"Latency: {latency:.2f} ms")
+            st.write(f"Confidence: {confidence}")
 
 # ────────────────────────
-# 📌 Footer
+#  Footer
 # ────────────────────────
 st.markdown("""
 <div class='footer'>

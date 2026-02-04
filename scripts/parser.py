@@ -4,7 +4,7 @@ import tempfile
 import sys  
 import pdfplumber
 from PyPDF2 import PdfReader
-from langchain_community.document_loaders import UnstructuredFileLoader
+from langchain.document_loaders import UnstructuredFileLoader
 from pdf2image import convert_from_path
 import pytesseract  
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -13,7 +13,6 @@ import logging
 logger = logging.getLogger(__name__)
 import docx2txt   
 
-   
 # ------------------------
 # 1. Text Cleaning
 # ------------------------
@@ -63,7 +62,7 @@ def extract_with_ocr(file_path: str) -> str:
 # 3. DOCX Extractors
 # ------------------------
 def extract_with_docx(file_path: str) -> str:
-    doc = docx.Document(file_path)
+    doc = Document(file_path)
     text = "\n".join([p.text for p in doc.paragraphs])
     return clean_text(text)
 
