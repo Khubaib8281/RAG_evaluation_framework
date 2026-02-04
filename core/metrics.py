@@ -9,3 +9,6 @@ class MetricsTracker:
         
     def stop(self):
         return (time.time() - self.start_time()) * 1000
+    
+    def estimate_tokens(text):
+        return len(text.split())
