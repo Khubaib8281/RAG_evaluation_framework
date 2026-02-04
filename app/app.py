@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import sys
+import pandas as pd
 
 # Append project path for imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -12,11 +13,14 @@ from core.metrics import MetricsTracker, estimate_tokens
 from scripts.embedder import embed_text
 from scripts.vector_store import build_faiss_index
 from scripts.question_answer import get_best_chunk
+from scripts.embedder import embed_text
 from scripts.gemini_api import generate_answer_from_chunks
+from core.hallucination import hallucination_check
+from core.confidence import compute_similarity
 
 # Page configuration
 st.set_page_config(page_title="AskMyDoc", page_icon="📄", layout="centered")
-
+tab1, tab2 = st.tabs(["User Mode", "Developer Mode"])
 # ────────────────────────
 # Custom CSS Styling
 # ────────────────────────
@@ -94,87 +98,107 @@ input[type="text"] {
 """, unsafe_allow_html=True)
 
 # ────────────────────────
-# 📌 TITLE & HEADER
-# ────────────────────────
-st.markdown("<div class='title-style'>📝 AskMyDoc</div>", unsafe_allow_html=True)
-st.write("Upload your document and ask questions about its content.")
-
-# ────────────────────────
-# ℹ️ How it Works
-# ────────────────────────
-with st.expander("ℹ️ How It Works"):
-    st.markdown("""
-    1. **Upload your document** (`.pdf`, `.docx`)  
-    2. It gets converted into text, split into smart chunks  
-    3. **Ask your question** → AI finds the best answers from context  
-    """)
-
-# ────────────────────────
-# 📤 File Upload
+# TITLE & HEADER
 # ────────────────────────
 
-init_db()
-uploaded_file = st.file_uploader("📁 Upload your file", type=["pdf", "docx"])
+with tab1:
+    
+    st.markdown("<div class='title-style'>📝 AskMyDoc</div>", unsafe_allow_html=True)
+    st.write("Upload your document and ask questions about its content.")
 
-if uploaded_file:
-    with st.spinner("🔍 Processing document..."):
-        # Unpack the tuple to get the extracted text and the message
-        extracted_text, message = extract_text_from_file(uploaded_file)
-        
-        # Check if text was successfully extracted before chunking
-        if extracted_text:
-            chunks = chunk_text(extracted_text)
-            total_chunks = len(chunks)
+    # ────────────────────────
+    # How it Works
+    # ────────────────────────
+    with st.expander("ℹ️ How It Works"):
+        st.markdown("""
+        1. **Upload your document** (`.pdf`, `.docx`)  
+        2. It gets converted into text, split into smart chunks  
+        3. **Ask your question** → AI finds the best answers from context  
+        """)
+
+    # ────────────────────────
+    # 📤 File Upload
+    # ────────────────────────
+
+    init_db()
+    uploaded_file = st.file_uploader("📁 Upload your file", type=["pdf", "docx"])
+
+    if uploaded_file:
+        with st.spinner("🔍 Processing document..."):
+            # Unpack the tuple to get the extracted text and the message
+            extracted_text, message = extract_text_from_file(uploaded_file)
             
-            if total_chunks < 2:
-                st.error("⚠️ The document is too short for answering questions. Please upload a longer document.")
-                log_error_message(str(message))
+            # Check if text was successfully extracted before chunking
+            if extracted_text:
+                chunks = chunk_text(extracted_text)
+                total_chunks = len(chunks)
+                
+                if total_chunks < 2:
+                    st.error("⚠️ The document is too short for answering questions. Please upload a longer document.")
+                    log_error_message(str(message))
+                else:
+                    st.success(message)
+
             else:
-                st.success(message)
+                # Handle cases where no text was extracted (e.g., unsupported file type)
+                log_error_message(str(message))
+                st.error(message)
+                st.stop()
 
-        else:
-            # Handle cases where no text was extracted (e.g., unsupported file type)
-            log_error_message(str(message))
-            st.error(message)
-            st.stop()
+            embeddings = embed_text(chunks)
+            index = build_faiss_index(embeddings)
 
-        embeddings = embed_text(chunks)
-        index = build_faiss_index(embeddings)
+        # st.success("✅ Document processed successfully!")
 
-    # st.success("✅ Document processed successfully!")
+        # ────────────────────────
+        # Q&A Section
+        # ────────────────────────
+        st.subheader("💬 Ask a Question")
+        user_question = st.text_input("Enter your question here")
+        hallucination_toggle = st.checkbox("Enable hallucination check")
 
-    # ────────────────────────
-    # Q&A Section
-    # ────────────────────────
-    st.subheader("💬 Ask a Question")
-    user_question = st.text_input("Enter your question here")
+        if st.button("🧠 Get Answer"):
+            if user_question.strip() == "":
+                st.warning("⚠️ Please enter a question.")
+            else:
+                with st.spinner("⏳ Analyzing document and generating answer..."):
+                    
+                    tracker = MetricsTracker()
+                    tracker.start()
+                    
+                    top_chunks = get_best_chunk(user_question, chunks, index)
+                    answer = generate_answer_from_chunks(top_chunks, user_question)
+                    
+                    latency = tracker.stop()
+                    tokens = estimate_tokens(user_question + answer)
+                    
+                    answer_emb = embed_text(answer)
+                    chunk_embs = embed_text(top_chunks)
 
-    if st.button("🧠 Get Answer"):
-        if user_question.strip() == "":
-            st.warning("⚠️ Please enter a question.")
-        else:
-            with st.spinner("⏳ Analyzing document and generating answer..."):
-                
-                tracker = MetricsTracker()
-                tracker.start()
-                
-                top_chunks = get_best_chunk(user_question, chunks, index)
-                answer = generate_answer_from_chunks(top_chunks, user_question)
-                
-                latency = tracker.stop()
-                tokens = estimate_tokens(user_question + answer)
-                
-                confidence = 0.85
-                hallucination = 0.0
-                
-                log_request(user_question, answer, latency, tokens, confidence, hallucination)
-                
-                
-            st.markdown("### 📚 Answer")
-            st.success(answer)
-            st.write(f"Latency: {latency:.2f} ms")
-            st.write(f"Confidence: {confidence}")
+                    hallucinated, similarity = hallucination_check(answer_emb, chunk_embs)
+                    confidence = compute_similarity(similarity)
+                    
+                    log_request(user_question, answer, latency, tokens, confidence, hallucinated)
+                    
+                    
+                st.markdown("### 📚 Answer")
+                st.success(answer)
+                st.write(f"Latency: {latency:.2f} ms")
+                st.write(f"Confidence: {confidence}")
+                if hallucinated:
+                    st.warning("⚠ Possible hallucination detected")
 
+with tab2:
+    st.subheader("System Analytics")
+    
+    import sqlite3
+    conn = sqlite3.connect("data/logs.db")
+    
+    df = pd.read_sql("SELECT * FROM requests", conn)
+    st.dataframe(df)
+    
+    st.metric("Avg Latency", round(df["latency_ms"].mean(),2))
+    st.metric("Hallucination Rate", round(df["hallucination"].mean()*100,2))
 # ────────────────────────
 #  Footer
 # ────────────────────────
