@@ -22,7 +22,7 @@ from core.cache import get_cache, save_cache
 from core.confidence import compute_similarity
 
 # Page configuration
-st.set_page_config(page_title="AskMyDoc", page_icon="📄", layout="centered")
+st.set_page_config(page_title="QueryVault", page_icon="📄", layout="centered")
 tab1, tab2 = st.tabs(["User Mode", "Developer Mode"])
 # ────────────────────────
 # Custom CSS Styling
@@ -122,7 +122,7 @@ def reset_document_state():
             del st.session_state[key]
 
 with tab1:
-    st.markdown("<div class='title-style'>📝 AskMyDoc</div>", unsafe_allow_html=True)
+    st.markdown("<div class='title-style'>📝 QueryVault</div>", unsafe_allow_html=True)
     st.write("Upload your document and ask questions about its content.")
 
     with st.expander("ℹ️ How It Works"):
@@ -253,6 +253,6 @@ with tab2:
 # ────────────────────────
 st.markdown("""
 <div class='footer'>
-    &copy; 2025 • Developed by <strong>Muhammad Khubaib Ahmad</strong> | AskMyDoc
+    &copy; 2025 • Developed by <strong>Muhammad Khubaib Ahmad</strong> | QueryVault
 </div>
 """, unsafe_allow_html=True)
