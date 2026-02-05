@@ -112,14 +112,19 @@ def get_logs():
     
     return df
 
+import streamlit as st
+import altair as alt
+
+# --- HELPER TO RESET ON NEW UPLOAD ---
+def reset_document_state():
+    for key in ["chunks", "index", "processed_file_name"]:
+        if key in st.session_state:
+            del st.session_state[key]
+
 with tab1:
-    
     st.markdown("<div class='title-style'>📝 AskMyDoc</div>", unsafe_allow_html=True)
     st.write("Upload your document and ask questions about its content.")
 
-    # ────────────────────────
-    # How it Works
-    # ────────────────────────
     with st.expander("ℹ️ How It Works"):
         st.markdown("""
         1. **Upload your document** (`.pdf`, `.docx`)  
@@ -127,115 +132,122 @@ with tab1:
         3. **Ask your question** → AI finds the best answers from context  
         """)
 
-    # ────────────────────────
-    # 📤 File Upload
-    # ────────────────────────
-
     init_db()
-    uploaded_file = st.file_uploader("📁 Upload your file", type=["pdf", "docx"])
+    
+    # Use an on_change callback to clear memory when a new file is uploaded
+    uploaded_file = st.file_uploader("📁 Upload your file", type=["pdf", "docx"], on_change=reset_document_state)
 
     if uploaded_file:
-        with st.spinner("🔍 Processing document..."):
-            # Unpack the tuple to get the extracted text and the message
-            extracted_text, message = extract_text_from_file(uploaded_file)
-            
-            # Check if text was successfully extracted before chunking
-            if extracted_text:
-                chunks = chunk_text(extracted_text)
-                total_chunks = len(chunks)
+        # Check if we have already processed THIS specific file
+        file_id = f"{uploaded_file.name}_{uploaded_file.size}"
+        
+        if "processed_file_name" not in st.session_state or st.session_state.processed_file_name != file_id:
+            with st.spinner("🔍 Processing document and building vector index..."):
+                extracted_text, message = extract_text_from_file(uploaded_file)
                 
-                if total_chunks < 2:
-                    st.error("⚠️ The document is too short for answering questions. Please upload a longer document.")
-                    log_error_message(str(message))
+                if extracted_text:
+                    chunks = chunk_text(extracted_text)
+                    if len(chunks) < 2:
+                        st.error("⚠️ The document is too short.")
+                        st.stop()
+                    
+                    # --- THE HEAVY LIFTING ---
+                    embeddings = embed_text(chunks)
+                    index = build_faiss_index(embeddings)
+                    
+                    # --- STORE IN SESSION STATE ---
+                    st.session_state.chunks = chunks
+                    st.session_state.index = index
+                    st.session_state.processed_file_name = file_id
+                    st.success("✅ Document indexed and saved to memory!")
                 else:
-                    st.success(message)
-
-            else:
-                # Handle cases where no text was extracted (e.g., unsupported file type)
-                log_error_message(str(message))
-                st.error(message)
-                st.stop()
-
-            embeddings = embed_text(chunks)
-            index = build_faiss_index(embeddings)
-
-        # st.success("✅ Document processed successfully!")
+                    st.error(message)
+                    st.stop()
+        else:
+            st.info(f"⚡ Using cached index for: {uploaded_file.name}")
 
         # ────────────────────────
         # Q&A Section
         # ────────────────────────
         st.subheader("💬 Ask a Question")
         user_question = st.text_input("Enter your question here")
-        hallucination_toggle = st.checkbox("Enable hallucination check")
 
         if st.button("🧠 Get Answer"):
             if user_question.strip() == "":
                 st.warning("⚠️ Please enter a question.")
             else:
-                with st.spinner("⏳ Analyzing document and generating answer..."):
-                    
+                # Retrieve from session state instead of re-processing
+                chunks = st.session_state.chunks
+                index = st.session_state.index
+
+                with st.spinner("⏳ Analyzing context..."):
                     tracker = MetricsTracker()
                     tracker.start()
-                    
-                    # caching via sqlite
-                    cached_answer = get_cache(user_question)
+
+                    # Cache check logic
+                    cached_answer, cached_chunks = get_cache(user_question)
+
                     if cached_answer:
                         answer = cached_answer
+                        top_chunks = cached_chunks
                     else:
+                        # Use the index stored in session state
                         top_chunks = get_best_chunk(user_question, chunks, index)
                         answer = generate_answer_from_chunks(top_chunks, user_question)
-                        save_cache(user_question, answer)
-                    
+                        save_cache(user_question, answer, top_chunks)
+
                     latency = tracker.stop()
-                    
                     tokens = estimate_tokens(user_question + answer)
                     
+                    # Hallucination Check
                     answer_emb = embed_text(answer)
                     chunk_embs = embed_text(top_chunks)
-
                     hallucinated, similarity = hallucination_check(answer_emb, chunk_embs)
                     confidence = compute_similarity(similarity)
-                    
+
                     log_request(user_question, answer, latency, tokens, confidence, hallucinated)
-                    
-                
+
                 st.markdown("### 📚 Answer")
                 st.success(answer)
-                st.write(f"Latency: {latency:.2f} ms")
-                st.write(f"Confidence: {confidence}")
-                st.write(f"Tokens: {tokens}")
+                
+                # Metrics Display
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Latency", f"{latency:.0f}ms")
+                col2.metric("Confidence", f"{confidence}%")
+                col3.metric("Tokens", tokens)
+
                 if hallucinated:
                     st.warning("⚠ Possible hallucination detected")
-                    log_error_message(error_message="Hallucination Detected")
 
 with tab2:
     st.title("Developer Analytics Dashboard")
-    
-    st.subheader("Metrics")
-    
     df = get_logs()
     
-    st.metric("Total Requests", len(df))
-    st.metric("Avg Latency (ms)", round(df['latency_ms'].mean(), 2))
-    st.metric("Hallucination Rate (%)", round(df['hallucination'].mean()*100, 2))
-    st.metric("Avg Confidence (%)", round(df['confidence'].mean(), 2))
+    if not df.empty:
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Total Requests", len(df))
+        m2.metric("Avg Latency (ms)", round(df['latency_ms'].mean(), 2))
+        m3.metric("Hallucination Rate (%)", round(df['hallucination'].mean()*100, 2))
+        m4.metric("Avg Confidence (%)", round(df['confidence'].mean(), 2))
 
-    st.subheader("Request Latency Distribution")
-    chart = alt.Chart(df).mark_bar().encode(
+        st.subheader("Request Latency Distribution")
+        chart = alt.Chart(df).mark_bar().encode(
         x=alt.X('latency_ms', bin=alt.Bin(maxbins=30)),
         y='count()'
-    )
-    st.altair_chart(chart, use_container_width=True)
+        )
+        st.altair_chart(chart, use_container_width=True, width='stretch')
 
-    st.subheader("Hallucination Trend")
-    hall_chart = alt.Chart(df).mark_line().encode(
+        st.subheader("Hallucination Trend")
+        hall_chart = alt.Chart(df).mark_line().encode(
         x='timestamp',
         y='hallucination'
     )
-    st.altair_chart(hall_chart, use_container_width=True)
+        st.altair_chart(hall_chart, use_container_width=True, width='stretch')
 
-    st.subheader("Top User Queries")
-    st.dataframe(df[['query', 'latency_ms', 'confidence', 'hallucination']].head(20))
+        st.subheader("Top User Queries")
+        st.dataframe(df[['query', 'latency_ms', 'confidence', 'hallucination']].head(20))
+    else:
+        st.info("No logs available yet.")
 # ────────────────────────
 #  Footer
 # ────────────────────────
