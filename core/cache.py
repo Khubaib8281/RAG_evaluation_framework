@@ -1,5 +1,6 @@
 import hashlib
 import datetime
+import json
 from .db import get_connection
 
 def hash_query(query):
@@ -11,25 +12,26 @@ def get_cache(query):
     
     qhash = hash_query(query)
     
-    cursor.execute("""SELECT answer FROM cache WHERE query_hash=?""", (qhash,))
+    cursor.execute("""SELECT answer, top_chunks FROM cache WHERE query_hash=?""", (qhash,))
     row = cursor.fetchone()
     
     conn.close()
     
     if row:
-        return row[0]
+        return row[0], json.loads(row[1])
     else:
-        return None
+        return None, None
     
-def save_cache(query , answer):
+def save_cache(query , answer, top_chunks):
     conn = get_connection()
     cursor = conn.cursor()
     
     qhash = hash_query(query)
     
-    cursor.execute("""INSERT OR REPLACE INTO cache(query_hash, answer, timestamp) VALUES(?, ?, ?)""", (
+    cursor.execute("""INSERT OR REPLACE INTO cache(query_hash, answer, top_chunks, timestamp) VALUES(?, ?, ?, ?)""", (
         qhash,
         answer,
+        json.dumps(top_chunks),
         datetime.datetime.utcnow().isoformat()
     ))
     
