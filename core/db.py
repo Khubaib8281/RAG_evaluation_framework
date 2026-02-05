@@ -35,8 +35,9 @@ def init_db():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS cache(
             query_hash TEXT PRIMARY KEY,
-            answer TEXT,
-            timestamp TEXT
+            answer TEXT NOT NULL,
+            top_chunks TEXT,
+            timestamp TEXT NOT NULL
     )
     """)
     
