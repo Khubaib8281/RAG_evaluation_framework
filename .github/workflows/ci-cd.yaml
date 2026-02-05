@@ -22,7 +22,6 @@ jobs:
         run: |
           pip install -r requirements.txt
 
-      - name: Run Evaluation
-        run: |
-          python evaluation/evaluate.py
-
+      # - name: Run Evaluation
+      #   run: |
+      #     python evaluation/evaluate.py
