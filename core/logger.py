@@ -26,7 +26,7 @@ def log_error_message(error_message):
     cursor = conn.cursor()
     
     cursor.execute("""
-        INSERT INTO (timestamp, error_message)
+        INSERT INTO errors(timestamp, error_message)
         VALUES(?, ?)
     """, (
         datetime.datetime.utcnow().isoformat(),
