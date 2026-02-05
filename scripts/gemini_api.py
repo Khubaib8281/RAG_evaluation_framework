@@ -1,8 +1,16 @@
 def generate_answer_from_chunks(chunks, question):
     import os
+    from dotenv import load_dotenv
     import google.generativeai as genai
-
-    genai.configure(api_key = os.getenv("GEMINI_API_KEY"))
+    
+    load_dotenv()
+    
+    api_key = os.getenv("GEMINI_API_KEY")
+    
+    if not api_key:
+        raise ValueError("GOOGLE_API_KEY not found in environment")
+    
+    genai.configure(api_key = api_key)
     gemini_model = genai.GenerativeModel("gemini-2.5-flash")
     context = "\n\n".join(chunks)
     prompt = f"""
