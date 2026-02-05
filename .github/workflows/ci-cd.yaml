@@ -3,7 +3,7 @@ name: RAG system CI
 on:
   push:
     branch: [main]
-  pull_requests:
+  pull-requests:
     branch : [main]
 
 jobs:
