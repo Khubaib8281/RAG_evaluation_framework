@@ -16,4 +16,4 @@ docx
 langchain
 langchain-community
 unstructured
-
+torch
