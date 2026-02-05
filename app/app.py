@@ -2,6 +2,8 @@ import streamlit as st
 import os
 import sys
 import pandas as pd
+import sqlite3
+import altair as alt
 
 # Append project path for imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -207,16 +209,33 @@ with tab1:
                     log_error_message(error_message="Hallucination Detected")
 
 with tab2:
-    st.subheader("System Analytics")
+    st.title("Developer Analytics Dashboard")
     
-    import sqlite3
-    conn = sqlite3.connect("data/logs.db")
+    st.subheader("Metrics")
     
-    df = pd.read_sql("SELECT * FROM requests ORDER BY timestamp DESC", conn)
-    st.dataframe(df)
+    df = get_logs()
     
-    st.metric("Avg Latency", round(df["latency_ms"].mean(),2))
-    st.metric("Hallucination Rate", round(df["hallucination"].mean()*100,2))
+    st.metric("Total Requests", len(df))
+    st.metric("Avg Latency (ms)", round(df['latency_ms'].mean(), 2))
+    st.metric("Hallucination Rate (%)", round(df['hallucination'].mean()*100, 2))
+    st.metric("Avg Confidence (%)", round(df['confidence'].mean(), 2))
+
+    st.subheader("Request Latency Distribution")
+    chart = alt.Chart(df).mark_bar().encode(
+        x=alt.X('latency_ms', bin=alt.Bin(maxbins=30)),
+        y='count()'
+    )
+    st.altair_chart(chart, use_container_width=True)
+
+    st.subheader("Hallucination Trend")
+    hall_chart = alt.Chart(df).mark_line().encode(
+        x='timestamp',
+        y='hallucination'
+    )
+    st.altair_chart(hall_chart, use_container_width=True)
+
+    st.subheader("Top User Queries")
+    st.dataframe(df[['query', 'latency_ms', 'confidence', 'hallucination']].head(20))
 # ────────────────────────
 #  Footer
 # ────────────────────────
