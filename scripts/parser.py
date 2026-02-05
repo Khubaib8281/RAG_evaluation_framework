@@ -4,14 +4,14 @@ import tempfile
 import sys  
 import pdfplumber
 from PyPDF2 import PdfReader
-from langchain.document_loaders import UnstructuredFileLoader
+from langchain_community.document_loaders import UnstructuredFileLoader
 from pdf2image import convert_from_path
-import pytesseract  
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+import pytesseract
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from docx import Document
 import logging
 logger = logging.getLogger(__name__)
-import docx2txt   
+import docx2txt 
 
 # ------------------------
 # 1. Text Cleaning

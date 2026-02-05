@@ -16,6 +16,7 @@ from scripts.question_answer import get_best_chunk
 from scripts.embedder import embed_text
 from scripts.gemini_api import generate_answer_from_chunks
 from core.hallucination import hallucination_check
+from core.cache import get_cache, save_cache
 from core.confidence import compute_similarity
 
 # Page configuration
@@ -101,6 +102,14 @@ input[type="text"] {
 # TITLE & HEADER
 # ────────────────────────
 
+def get_logs():
+    conn = sqlite3.connect("data/logs.db")
+    
+    df = pd.read_sql("SELECT * FROM requests ORDER BY timestamp DESC", conn)
+    conn.close()
+    
+    return df
+
 with tab1:
     
     st.markdown("<div class='title-style'>📝 AskMyDoc</div>", unsafe_allow_html=True)
@@ -166,10 +175,17 @@ with tab1:
                     tracker = MetricsTracker()
                     tracker.start()
                     
-                    top_chunks = get_best_chunk(user_question, chunks, index)
-                    answer = generate_answer_from_chunks(top_chunks, user_question)
+                    # caching via sqlite
+                    cached_answer = get_cache(user_question)
+                    if cached_answer:
+                        answer = cached_answer
+                    else:
+                        top_chunks = get_best_chunk(user_question, chunks, index)
+                        answer = generate_answer_from_chunks(top_chunks, user_question)
+                        save_cache(user_question, answer)
                     
                     latency = tracker.stop()
+                    
                     tokens = estimate_tokens(user_question + answer)
                     
                     answer_emb = embed_text(answer)
@@ -180,13 +196,15 @@ with tab1:
                     
                     log_request(user_question, answer, latency, tokens, confidence, hallucinated)
                     
-                    
+                
                 st.markdown("### 📚 Answer")
                 st.success(answer)
                 st.write(f"Latency: {latency:.2f} ms")
                 st.write(f"Confidence: {confidence}")
+                st.write(f"Tokens: {tokens}")
                 if hallucinated:
                     st.warning("⚠ Possible hallucination detected")
+                    log_error_message(error_message="Hallucination Detected")
 
 with tab2:
     st.subheader("System Analytics")
@@ -194,7 +212,7 @@ with tab2:
     import sqlite3
     conn = sqlite3.connect("data/logs.db")
     
-    df = pd.read_sql("SELECT * FROM requests", conn)
+    df = pd.read_sql("SELECT * FROM requests ORDER BY timestamp DESC", conn)
     st.dataframe(df)
     
     st.metric("Avg Latency", round(df["latency_ms"].mean(),2))

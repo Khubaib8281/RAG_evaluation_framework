@@ -1,6 +1,6 @@
 try:
     # new package split
-    from langchain.text_splitter import RecursiveCharacterTextSplitter
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
 except ImportError:
     # fallback for older versions
     from langchain.text_splitter import RecursiveCharacterTextSplitter
