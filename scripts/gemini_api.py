@@ -1,4 +1,4 @@
-def generate_answer_from_chunks(chunks, question):
+def generate_answer_from_chunks_gemini(chunks, question):
     import os
     from dotenv import load_dotenv
     import google.generativeai as genai
