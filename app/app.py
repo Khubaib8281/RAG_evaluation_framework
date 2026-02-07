@@ -12,11 +12,12 @@ from scripts.chunker import chunk_text
 from core.db import init_db
 from core.logger import log_error_message, log_request
 from core.metrics import MetricsTracker, estimate_tokens
+from scripts.local_llm import generate_answer_from_chunks_local
 from scripts.embedder import embed_text
 from scripts.vector_store import build_faiss_index
 from scripts.question_answer import get_best_chunk
 from scripts.embedder import embed_text
-from scripts.gemini_api import generate_answer_from_chunks
+from scripts.gemini_api import generate_answer_from_chunks_gemini
 from core.hallucination import hallucination_check
 from core.cache import get_cache, save_cache
 from core.confidence import compute_similarity
@@ -112,8 +113,15 @@ def get_logs():
     
     return df
 
-import streamlit as st
-import altair as alt
+def generate_answer_from_chunks(chunks, question, llm_provider="gemini"):
+    if llm_provider == "local":
+        result = generate_answer_from_chunks_local(chunks, question)
+        return result["text"]
+    elif llm_provider == "gemini":
+        return generate_answer_from_chunks_gemini(chunks, question)
+    else:
+        raise ValueError("Invalid LLM provider")
+
 
 # --- HELPER TO RESET ON NEW UPLOAD ---
 def reset_document_state():
@@ -171,6 +179,12 @@ with tab1:
         # ────────────────────────
         st.subheader("💬 Ask a Question")
         user_question = st.text_input("Enter your question here")
+        
+        llm_provider = st.radio(
+            "Select LLM",
+            ["gemini", "local"],
+            horizontal=True
+        )
 
         if st.button("🧠 Get Answer"):
             if user_question.strip() == "":
@@ -193,9 +207,12 @@ with tab1:
                     else:
                         # Use the index stored in session state
                         top_chunks = get_best_chunk(user_question, chunks, index)
-                        answer = generate_answer_from_chunks(top_chunks, user_question)
-                        save_cache(user_question, answer, top_chunks)
-
+                        answer = generate_answer_from_chunks(top_chunks, user_question, llm_provider='local')
+                        try:
+                            save_cache(user_question, answer, top_chunks)
+                        except sqlite3.InterfaceError as e:
+                            st.error(f"Serialization failed {e}")
+                            
                     latency = tracker.stop()
                     tokens = estimate_tokens(user_question + answer)
                     
@@ -205,7 +222,7 @@ with tab1:
                     hallucinated, similarity = hallucination_check(answer_emb, chunk_embs)
                     confidence = compute_similarity(similarity)
 
-                    log_request(user_question, answer, latency, tokens, confidence, hallucinated)
+                    log_request(user_question, answer, latency, tokens, llm_provider,confidence, hallucinated)
 
                 st.markdown("### 📚 Answer")
                 st.success(answer)
@@ -245,7 +262,7 @@ with tab2:
         st.altair_chart(hall_chart, use_container_width=True, width='stretch')
 
         st.subheader("Top User Queries")
-        st.dataframe(df[['query', 'latency_ms', 'confidence', 'hallucination']].head(20))
+        st.dataframe(df[['query', 'latency_ms', 'confidence', 'hallucination', 'provider']].head(20))
     else:
         st.info("No logs available yet.")
 # ────────────────────────
