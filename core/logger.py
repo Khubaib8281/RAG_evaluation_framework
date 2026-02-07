@@ -1,19 +1,20 @@
 import datetime
 from core.db import get_connection
 
-def log_request(query, answer, latency_ms, tokens_used, confidence, hallucination):
+def log_request(query, answer, latency_ms, tokens_used, provider,confidence, hallucination):
     conn = get_connection()
     cursor = conn.cursor()
     
     cursor.execute("""
-    INSERT INTO requests(timestamp, query, answer, latency_ms, tokens_used, confidence, hallucination)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO requests(timestamp, query, answer, latency_ms, tokens_used, provider,confidence, hallucination)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         datetime.datetime.utcnow().isoformat(),
         query,
         answer,
         latency_ms,
         tokens_used,
+        provider,
         confidence,
         hallucination
     ))
