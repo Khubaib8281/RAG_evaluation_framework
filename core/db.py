@@ -19,6 +19,7 @@ def init_db():
         answer TEXT,
         latency_ms REAL,
         tokens_used INTGER,
+        provider TEXT,
         confidence REAL,
         hallucination INTEGER
     )
