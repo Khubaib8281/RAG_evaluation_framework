@@ -26,12 +26,13 @@ def save_cache(query , answer, top_chunks):
     conn = get_connection()
     cursor = conn.cursor()
     
+    serialized_chunks = json.dumps(top_chunks, ensure_ascii=False)
     qhash = hash_query(query)
     
     cursor.execute("""INSERT OR REPLACE INTO cache(query_hash, answer, top_chunks, timestamp) VALUES(?, ?, ?, ?)""", (
         qhash,
         answer,
-        json.dumps(top_chunks),
+        serialized_chunks,
         datetime.datetime.utcnow().isoformat()
     ))
     
