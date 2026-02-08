@@ -114,7 +114,7 @@ def get_logs():
     return df
 
 def generate_answer_from_chunks(chunks, question, llm_provider="gemini"):
-    if llm_provider == "local":
+    if llm_provider == "local":  
         result = generate_answer_from_chunks_local(chunks, question)
         return result["text"]
     elif llm_provider == "gemini":
@@ -207,7 +207,7 @@ with tab1:
                     else:
                         # Use the index stored in session state
                         top_chunks = get_best_chunk(user_question, chunks, index)
-                        answer = generate_answer_from_chunks(top_chunks, user_question, llm_provider='local')
+                        answer = generate_answer_from_chunks(top_chunks, user_question, llm_provider)
                         try:
                             save_cache(user_question, answer, top_chunks)
                         except sqlite3.InterfaceError as e:
@@ -268,8 +268,28 @@ with tab2:
 # ────────────────────────
 #  Footer
 # ────────────────────────
-st.markdown("""
-<div class='footer'>
-    &copy; 2025 • Developed by <strong>Muhammad Khubaib Ahmad</strong> | QueryVault
-</div>
-""", unsafe_allow_html=True)
+st.markdown(
+    """
+    <style>
+    .footer {
+        position: fixed;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        background-color: #0e1117;
+        color: #aaaaaa;
+        text-align: center;
+        padding: 10px 0;
+        font-size: 14px;
+        z-index: 100;
+        border-top: 1px solid #333;
+    }
+    </style>
+
+    <div class="footer">
+        © 2026 • Developed by <strong>Muhammad Khubaib Ahmad</strong> | QueryVault
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
