@@ -1,114 +1,202 @@
-# 📄 AskMyDoc — Your AI-Powered Document Assistant
+# QueryVault
 
-AskMyDoc is an intelligent chatbot that **answers your questions directly from your documents**.  
-Upload PDFs, lecture notes, research papers, or any text-based file — AskMyDoc understands them, searches for relevant content, and gives you **fast, accurate, and context-aware answers**.
+QueryVault is a production-oriented **RAG-based document question-answering system** built for PDFs and Word documents. It combines local LLM inference, advanced caching, error handling, hallucination monitoring, and a developer dashboard to provide real-time analytics and insights.
+
+QueryVault is designed as a **local-first solution** for developers and AI enthusiasts who want to experiment with multi-agent systems, LLM evaluation, and document-centric AI workflows.
 
 ---
 
 ## 🚀 Features
 
-- 🔍 **Context-Aware Q&A** — Answers are grounded in your actual documents, not random internet text.
-- 📌 **Source References** — Get page numbers and highlighted text for every answer.
-- ⚡ **Blazing Fast** — Optimized chunking & vector search for speed.
-- 🔐 **Privacy First** — Option to run locally without sending data to external servers.
-- 🗣 **Natural Language Queries** — No keywords, just ask like you talk.
-- 🖼 **Multiple File Formats** — PDF, DOCX, TXT (more coming soon).
+- **RAG for PDFs and Word Docs:** Upload documents, extract chunks using multiple fallbacks (`pdfplumber`, `pytesseract`, `pdf2txt`, `python-docx`, `PyPDF2`), and retrieve the most relevant content for user queries.
+- **Local LLM Integration:** Uses TinyLlama 1.1B via `llama-server` for offline inference.
+- **Error Handling & Logging:** Comprehensive handling for parsing errors, LLM failures, and cache serialization issues.
+- **Cache & Performance Optimization:** Stores queries, answers, and top document chunks locally in SQLite3 to reduce latency and improve repeated query performance.
+- **Hallucination & Confidence Metrics:** Measures how well the generated answers align with the retrieved context, highlighting possible hallucinations.
+- **Developer Dashboard:** Live analytics for latency, hallucinations, token usage, and request logs.
 
 ---
 
-## 🎯 Use Cases
+## 🖥️ Demo / Screenshots
 
-- **Students** — Upload lecture notes & ask questions while studying.
-- **Researchers** — Search through research papers.
-- **Lawyers** — Quickly find clauses and case references.
-- **Writers & Analysts** — Summarize and extract key insights instantly.
+<!-- Replace with actual screenshots -->
+![QueryVault Dashboard](assets/dashboard.jpeg)
+*Developer dashboard showing average metrics and live query logs.*
 
----
-
-## 🛠 Tech Stack
-
-- **Frontend:** Streamlit
-- **Backend:** Python, FastAPI (optional API)
-- **AI/ML:** Gemini 2.0 flash API / Local LLM
-- **Document Parsing:** PyMuPDF
-- **Vector Database:** FAISS
-- **Orchestration:** LangChain
+![Query Answer Interface](assets/landing.jpeg)
+*User interface for uploading documents and asking questions.*
 
 ---
 
 ## 📦 Installation
 
-1. **Clone the repo**
-   ```bash
-   git clone https://github.com/Khubaib8281/Smart_NLP_Q-A_BOT.git
-   cd Smart_NLP_Q-A_BOT
-   ```
+**Requirements:**
 
-2. **Create a virtual environment**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate   # Mac/Linux
-   venv\Scripts\activate      # Windows
-   ```
+- Python 3.10+
+- 8GB RAM minimum
+- No GPU required for TinyLlama 1.1B (CPU inference only)
+- `llama-server` installed for local LLM
 
-3. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+**Clone the repository:**
 
-4. **Set environment variables**
-   - Create a `.env` file:
-     ```
-     GEMINI_API_KEY=your_api_key_here
-     ```
+```bash
+git clone https://github.com/Khubaib8281/QueryVault.git
+cd QueryVault
+```
 
-5. **Run the app**
-   ```bash
-   streamlit run streamlit_app.py
-   ```
+**Install dependencies:**
 
----
+```bash
+pip install -r requirements.txt
+```
 
-## 📸 Screenshots
+**Set up local LLM:**
 
-| Upload Screen | Chat Interface | Source Highlight |
-|---------------|----------------|------------------|
-| ![Interfce](assets/landing.jpg) | ![Chat](assets/chat.jpg) | ![Highlight](assets/res.jpg) |
+Download the TinyLlama model and start `llama-server`:
 
----
+```bash
+llama-server \
+  -m path/to/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf \
+  -c 2048 \
+  -t 12
+```
 
-## 🤖 How It Works
+**Run QueryVault:**
 
-1. **Upload Documents** — PDF, DOCX, TXT, etc.
-2. **Chunking** — Split documents into searchable text segments.
-3. **Embedding** — Convert text into vector embeddings.
-4. **Search** — Find relevant chunks for your query.
-5. **LLM Response** — Use an AI model to generate an answer based on retrieved chunks.
-6. **Citations** — Return references to exact pages/sections.
+```bash
+streamlit run app/app.py
+```
+
+The dashboard and query interface will open in your browser at `http://localhost:8501`.
 
 ---
 
-## 🤝 Contributing
+## ⚙️ Usage
 
-Contributions are welcome!  
-1. Fork the repo  
-2. Create a feature branch (`git checkout -b feature-name`)  
-3. Commit your changes (`git commit -m 'Add feature'`)  
-4. Push to your branch and open a PR  
-
----
-
-## 📜 License
-
-MIT License © 2025 Muhammad Khubaib Ahmad
+1. **Upload Documents:** PDFs or Word `.docx` files.
+2. **Ask Questions:** Type your question in the input box.
+3. **Select LLM Provider:** Currently, only the local LLM is supported.
+4. **Get Answers:** Responses are generated using RAG and displayed immediately.
+5. **Metrics:** Developer dashboard shows live latency, hallucination rate, confidence scores, and cached queries.
 
 ---
 
-## 🌟 Support
+## 🧰 Architecture & Design
 
-If you find AskMyDoc useful, please ⭐ the repo and share it!  
-For feedback or collaboration: **muhammadkhubaibahmad854@gmail.com**
+**QueryVault** is designed for local, production-style RAG pipelines:
+
+- **Document Processing:** Multi-layer extraction with fallback libraries for OCR and text parsing.
+- **Vector Database:** FAISS for embedding-based chunk retrieval.
+- **LLM Layer:** TinyLlama 1.1B via llama-server.
+- **Caching:** SQLite3 stores queries, answers, top chunks, timestamps, and metrics.
+- **Monitoring:** Logs latency, hallucination flags, confidence, and token usage.
+- **Dashboard:** Streamlit interface showing real-time analytics.
 
 ---
 
-> _"Stop searching. Start asking."_ — **AskMyDoc**
+## 🔧 Configuration & Settings
+
+- `MAX_CHUNK_SIZE` – Controls the length of document chunks sent to the model.
+- `TEMPERATURE` – Reduce hallucinations by setting to `0.1` for TinyLlama.
+- `CACHE_ENABLED` – Enable or disable local query caching.
+- `SIMILARITY_THRESHOLD` – Controls whether low-confidence chunks are skipped to avoid hallucinations.
+
+---
+
+## 🛡️ Hallucination Mitigation
+
+- Aggressive chunk trimming based on token limit
+- Strict grounding instructions for the model:
+  ```
+  Answer using ONLY the provided context.
+  If the answer is not in the document, reply "NOT FOUND IN DOCUMENT".
+  ```
+- Low temperature (0.1) and limited max tokens
+- Similarity-based gating to prevent answering when context is weak
+
+---
+
+## 📝 Logging & Metrics
+
+QueryVault logs:
+
+- **Query** – User input
+- **Answer** – LLM response
+- **Top Chunks** – Retrieved document context
+- **Latency (ms)** – Time taken for inference
+- **Tokens Used** – Tokens consumed for local LLM
+- **Confidence** – Cosine similarity-based score
+- **Hallucination** – Binary flag (0 or 1)
+
+Logs are persisted in SQLite3 for analysis and benchmarking.
+
+---
+
+## ⚡ Future Enhancements
+
+- Multi-agent workflows for automated document analysis
+- Integration of larger local LLMs (7B+) for better grounding and reduced hallucinations
+- Optional cloud LLM support for higher accuracy and reliability
+- Exportable reports from developer dashboard
+
+---
+
+## 📁 Folder Structure
+
+```
+QueryVault/
+├─ app/
+│  └─ app.py              # Streamlit interface
+├─ data/
+| ├─ logs.db
+├─ core/
+│  ├─ confidence.py        
+│  ├─ local_llm.py        # TinyLlama integration
+│  ├─ cache.py            # SQLite3 caching logic
+│  └─ metrics.py          # Latency, hallucination, confidence
+│  └─ db.py
+│  └─ hallucination.py
+│  └─ logger.py
+├─ scripts/
+│  └─ chunker.py
+│  └─ embedder.py
+│  └─ vector_store.py
+│  └─ gemini_api.py
+│  └─ local_llm.py
+│  └─ main.py
+│  └─ parser.py
+│  └─ question_answer.py
+├─ assets/
+│  ├─ landing.jpeg
+│  └─ dashboard.jpeg
+├─ requirements.txt
+├─ LISENCE
+└─ README.md
+```
+
+---
+
+## 📚 References & Libraries
+
+- [llama.cpp / llama-server](https://github.com/ggerganov/llama.cpp)
+- [FAISS](https://github.com/facebookresearch/faiss)
+- [pdfplumber](https://github.com/jsvine/pdfplumber)
+- [pytesseract](https://github.com/madmaze/pytesseract)
+- [python-docx](https://python-docx.readthedocs.io/)
+- [Streamlit](https://streamlit.io/)
+- [SQLite3](https://www.sqlite.org/)
+
+---
+
+## 📝 License
+
+MIT License © 2026 Muhammad Khubaib Ahmad
+
+---
+
+### 💡 Notes
+
+QueryVault is **local-first** and designed for experimentation with RAG pipelines, multi-agent workflows, and evaluation metrics. TinyLlama is used as a demo LLM; expect hallucinations with complex queries.  
+
+For reliable results in production, consider larger LLMs or cloud APIs.
+```
